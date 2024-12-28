@@ -9,19 +9,22 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Override
     public String getBotToken() {
-        return "";
+            return "";
     }
 
     @Override
     public void onUpdateReceived(Update update) {
 
-        String chatId = update.getMessage().getChatId().toString(); // Получение chat id
+        String chatId = update.getMessage().getChatId().toString(); // Получение id чата
 
         String text = update.getMessage().getText(); // Получение сообщения
 
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
-        message.setText(text);
+        if (text.equals("What's your name?")) {
+            message.setText("Example1");
+        }
+        else message.setText(text);
 
         try {
             this.execute(message);
