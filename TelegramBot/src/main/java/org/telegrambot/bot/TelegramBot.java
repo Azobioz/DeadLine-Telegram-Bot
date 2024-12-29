@@ -1,11 +1,19 @@
 package org.telegrambot.bot;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegrambot.config.BotConfig;
 
+@Service
 public class TelegramBot extends TelegramLongPollingBot {
+
+    @Autowired
+    private BotConfig config;
+
 
     @Override
     public String getBotToken() {
@@ -32,6 +40,17 @@ public class TelegramBot extends TelegramLongPollingBot {
         catch (TelegramApiException e) {
             System.out.println("Error: " + e.getMessage());
         }
+    }
+
+    public void sendMessage(String text) {
+
+        SendMessage message = new SendMessage();
+
+
+        try {
+            execute(text);
+        }
+        catch (T)
     }
 
     @Override
