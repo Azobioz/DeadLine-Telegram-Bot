@@ -1,60 +1,80 @@
 package org.telegrambot.bot;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.TelegramBotsApi;
+import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
+import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegrambot.config.BotConfig;
 
-@Service
+import java.util.ArrayList;
+import java.util.List;
+
+@Component
 public class TelegramBot extends TelegramLongPollingBot {
 
-    @Autowired
-    private BotConfig config;
+    final private BotConfig config;
 
-
-    @Override
-    public String getBotToken() {
-            return "";
-    }
-
-    @Override
-    public void onUpdateReceived(Update update) {
-
-        String chatId = update.getMessage().getChatId().toString(); // Получение id чата
-
-        String text = update.getMessage().getText(); // Получение сообщения
-
-        SendMessage message = new SendMessage();
-        message.setChatId(chatId);
-        if (text.equals("What's your name?")) {
-            message.setText("Example1");
-        }
-        else message.setText(text);
-
+    public TelegramBot(BotConfig config) {
+        this.config = config;
+        List<BotCommand> listOfCommands = new ArrayList<>();
+        listOfCommands.add(new BotCommand("/start", "get a welcome message"));
         try {
-            this.execute(message);
+            this.execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
         }
         catch (TelegramApiException e) {
             System.out.println("Error: " + e.getMessage());
         }
     }
 
-    public void sendMessage(String text) {
+    @Override
+    public void onUpdateReceived(Update update) {
+        if (update.hasMessage() && update.getMessage().hasText()) {
 
-        SendMessage message = new SendMessage();
+            long chatId = update.getMessage().getChatId();
+            String text = update.getMessage().getText();
 
+            SendMessage message = new SendMessage();
 
-        try {
-            execute(text);
+            message.setChatId(chatId);
+
+            switch (text) {
+                case "/start":
+                    sendMessage(chatId, "hello");
+            }
         }
-        catch (T)
+    }
+
+    public void sendMessage(long chatId, String textToSend) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId);
+        message.setText(textToSend);
+        executeMessage(message);
+    }
+
+    public void executeMessage(SendMessage message)  {
+        try {
+            execute(message);
+        }
+        catch (TelegramApiException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+
+    @Override
+    public String getBotToken() {
+        return config.getToken();
     }
 
     @Override
     public String getBotUsername() {
-        return "Dl_Dead_Line_bot";
+        return config.getName();
     }
 }
