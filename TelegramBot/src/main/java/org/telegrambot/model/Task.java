@@ -8,6 +8,7 @@ import org.telegrambot.bot.TelegramBot;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
+import java.sql.Timestamp;
 
 @Data
 @Entity(name="task")
@@ -18,6 +19,7 @@ public class Task {
     private long id;
     @Length(max=250)
     private String name;
+    private Timestamp deadline;
     @ManyToOne
     @NotNull
     private TelegramUser user;
