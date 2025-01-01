@@ -24,7 +24,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     public TelegramBot(BotConfig config) {
         this.config = config;
         List<BotCommand> listOfCommands = new ArrayList<>();
-        listOfCommands.add(new BotCommand("/start", "get a welcome message"));
+        listOfCommands.add(new BotCommand("/start", "about this bot"));
         try {
             this.execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
         }
@@ -46,9 +46,20 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             switch (text) {
                 case "/start":
-                    sendMessage(chatId, "hello");
+                    startCommandReceived(chatId, update.getMessage().getChat().getUserName());
+                    break;
+                case "/create":
+
+                    break;
             }
         }
+    }
+
+
+
+    public void startCommandReceived(long chatId, String username) {
+        String text = "Hi " + username + ", this is a bot for task management ";
+        sendMessage(chatId, text);
     }
 
     public void sendMessage(long chatId, String textToSend) {
