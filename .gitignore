@@ -1,4 +1,6 @@
 */target
-*.jar
-application.properties
-.idea/
+
+/.idea
+/application.properties
+
+

@@ -1,14 +1,13 @@
 package org.telegrambot.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.validator.constraints.Length;
 import org.springframework.beans.factory.annotation.Value;
+import org.telegrambot.bot.TelegramBot;
 
 import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
 
 @Data
 @Entity(name="task")
@@ -19,5 +18,8 @@ public class Task {
     private long id;
     @Length(max=250)
     private String name;
+    @ManyToOne
+    @NotNull
+    private TelegramUser user;
 
 }
