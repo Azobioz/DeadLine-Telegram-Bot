@@ -12,10 +12,14 @@ import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegrambot.config.BotConfig;
+import org.telegrambot.dto.TaskDto;
+import org.telegrambot.dto.TelegramUserDto;
 import org.telegrambot.model.Task;
 import org.telegrambot.model.TelegramUser;
 import org.telegrambot.repository.TaskRepository;
 import org.telegrambot.repository.UserRepository;
+import org.telegrambot.service.TaskService;
+import org.telegrambot.service.TelegramUserService;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -25,21 +29,22 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.telegrambot.mapper.TelegramUserMapper.mapToTelegramUser;
+
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
 
     final private BotConfig config;
     private Map<Long, BotState> userStates = new HashMap<>();
-    @Autowired
-    UserRepository userRepository;
-    @Autowired
-    TaskRepository taskRepository;
+    TaskService taskService;
+    TelegramUserService userService;
 
 
 
-    public TelegramBot(BotConfig config, UserRepository userRepository) {
+    public TelegramBot(BotConfig config, TelegramUserService userService, TaskService taskService) {
         this.config = config;
-        this.userRepository = userRepository;
+        this.userService = userService;
+        this.taskService = taskService;
         List<BotCommand> listOfCommands = new ArrayList<>();
         listOfCommands.add(new BotCommand("/start", "about this bot"));
         try {
@@ -62,8 +67,9 @@ public class TelegramBot extends TelegramLongPollingBot {
             SendMessage message = new SendMessage();
             message.setChatId(chatId);
             String username = update.getMessage().getChat().getUserName();
-            Task task = new Task();
-            TelegramUser user = userRepository.findUserByUsername(username);
+
+            TaskDto taskDto = new TaskDto();
+            TelegramUserDto userDto = userService.findTelegramUserByUsername(username);
             switch (currentState) {
                 case IDLE:
                     switch (text) {
@@ -81,10 +87,10 @@ public class TelegramBot extends TelegramLongPollingBot {
 
                 case AWAITING_DATE:
                     if (isValidTimestamp(text)) {
-                        task.setDeadline(parseToTimestamp(text));
-                       
-                        task.setUser(user);
-                        user.addTask(task);
+                        taskDto.setDeadline(parseToTimestamp(text));
+
+                        taskDto.setUser(mapToTelegramUser(userDto));
+                        userDto.addTask(taskDto);
                         sendMessage(chatId, "Введите название задачи");
                     }
                     else {
@@ -96,10 +102,9 @@ public class TelegramBot extends TelegramLongPollingBot {
 
                 case AWAITING_NAME:
 
-                    Hibernate.initialize(user.getTasks());
-                    task.setName(text);
-                    user.addTask(task);
-
+                    taskDto.setName(text);
+                    userDto.addTask(taskDto);
+                    taskService.saveTask(taskDto);
                     sendMessage(chatId, "Задача добавлена");
                     userStates.put(chatId, BotState.IDLE);
                     break;
@@ -134,10 +139,10 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     public void register(String username) {
-        if (userRepository.findUserByUsername(username) == null) {
-            TelegramUser user = new TelegramUser();
-            user.setUsername(username);
-            userRepository.save(user);
+        if (userService.findTelegramUserByUsername(username) == null) {
+            TelegramUserDto userDto = new TelegramUserDto();
+            userDto.setUsername(username);
+            userService.saveTelegramUser(userDto);
         }
     }
 

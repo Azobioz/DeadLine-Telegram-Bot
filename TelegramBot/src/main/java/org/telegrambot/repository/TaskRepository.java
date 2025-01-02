@@ -7,5 +7,7 @@ import org.telegrambot.model.TelegramUser;
 
 @Repository
 public interface TaskRepository extends JpaRepository<Task, Long> {
-    Task findTaskByUser(TelegramUser user);
+
+
+
 }
