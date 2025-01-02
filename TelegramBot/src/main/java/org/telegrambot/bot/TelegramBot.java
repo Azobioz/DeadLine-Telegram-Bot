@@ -79,7 +79,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                             break;
                         case "/create":
                             register(username);
-                            sendMessage(chatId, "Введите дату (день-месяц-год час-минута)");
+                            sendMessage(chatId, "Введите дату (день-месяц-год час:минута)");
                             userStates.put(chatId, BotState.AWAITING_DATE);
                             break;
                     }
