@@ -3,9 +3,7 @@ package org.telegrambot.service.serviceimpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegrambot.dto.TelegramUserDto;
-import org.telegrambot.model.TelegramUser;
 import org.telegrambot.repository.UserRepository;
 import org.telegrambot.service.TelegramUserService;
 

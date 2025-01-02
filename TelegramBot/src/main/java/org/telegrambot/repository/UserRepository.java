@@ -6,7 +6,5 @@ import org.telegrambot.model.TelegramUser;
 
 @Repository
 public interface UserRepository extends JpaRepository<TelegramUser, Long> {
-
     TelegramUser findTelegramUserByUsername(String username);
-
 }

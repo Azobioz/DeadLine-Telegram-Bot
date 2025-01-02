@@ -1,9 +1,6 @@
 package org.telegrambot.bot;
 
-import org.hibernate.Hibernate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -14,10 +11,6 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegrambot.config.BotConfig;
 import org.telegrambot.dto.TaskDto;
 import org.telegrambot.dto.TelegramUserDto;
-import org.telegrambot.model.Task;
-import org.telegrambot.model.TelegramUser;
-import org.telegrambot.repository.TaskRepository;
-import org.telegrambot.repository.UserRepository;
 import org.telegrambot.service.TaskService;
 import org.telegrambot.service.TelegramUserService;
 
@@ -36,10 +29,9 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     final private BotConfig config;
     private Map<Long, BotState> userStates = new HashMap<>();
+    TaskDto taskDto = new TaskDto();
     TaskService taskService;
     TelegramUserService userService;
-
-
 
     public TelegramBot(BotConfig config, TelegramUserService userService, TaskService taskService) {
         this.config = config;
@@ -68,8 +60,8 @@ public class TelegramBot extends TelegramLongPollingBot {
             message.setChatId(chatId);
             String username = update.getMessage().getChat().getUserName();
 
-            TaskDto taskDto = new TaskDto();
             TelegramUserDto userDto = userService.findTelegramUserByUsername(username);
+
             switch (currentState) {
                 case IDLE:
                     switch (text) {
@@ -88,20 +80,18 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case AWAITING_DATE:
                     if (isValidTimestamp(text)) {
                         taskDto.setDeadline(parseToTimestamp(text));
-
                         taskDto.setUser(mapToTelegramUser(userDto));
                         userDto.addTask(taskDto);
                         sendMessage(chatId, "Введите название задачи");
+                        userStates.put(chatId, BotState.AWAITING_NAME);
                     }
                     else {
                         sendMessage(chatId, "Неверный формат данных");
                         userStates.put(chatId, BotState.IDLE);
                     }
-                    userStates.put(chatId, BotState.AWAITING_NAME);
                     break;
 
                 case AWAITING_NAME:
-
                     taskDto.setName(text);
                     userDto.addTask(taskDto);
                     taskService.saveTask(taskDto);
@@ -115,7 +105,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     public Timestamp parseToTimestamp(String timestamp) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
         try {
             LocalDateTime localDateTime = LocalDateTime.parse(timestamp, formatter);
             return Timestamp.valueOf(localDateTime);
@@ -145,7 +135,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             userService.saveTelegramUser(userDto);
         }
     }
-
 
     private void startCommandReceived(long chatId, String username) {
         String text = "Hi " + username + ", this is a bot for task management ";

@@ -1,7 +1,6 @@
 package org.telegrambot.service;
 
 import org.telegrambot.dto.TelegramUserDto;
-import org.telegrambot.model.TelegramUser;
 
 public interface TelegramUserService {
 
