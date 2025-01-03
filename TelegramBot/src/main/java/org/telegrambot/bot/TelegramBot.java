@@ -76,7 +76,13 @@ public class TelegramBot extends TelegramLongPollingBot {
                         case "/create":
                             register(username);
                             sendMessage(chatId, "Введите дату (день-месяц-год час:минута)");
-                            userStates.put(chatId, BotState.AWAITING_DATE);
+                            if (parseToLocalDateTime(text).isBefore(LocalDateTime.now())) {
+                                sendMessage(chatId, "");
+                                userStates.put(chatId, BotState.IDLE);
+                            }
+                            else {
+                                userStates.put(chatId, BotState.AWAITING_DATE);
+                            }
                             break;
                         case "/check":
                             List<TaskDto> list = taskService.getAllTasksByUser(userDto);
@@ -89,8 +95,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                     break;
 
                 case AWAITING_DATE:
-                    if (isValidTimestamp(text)) {
-                        taskDto.setDeadline(parseToTimestamp(text));
+                    if (isValidLocalDateTime(text)) {
+                        taskDto.setDeadline(parseToLocalDateTime(text));
                         taskDto.setUser(mapToTelegramUser(userDto));
                         userDto.addTask(taskDto);
                         sendMessage(chatId, "Введите название задачи");
@@ -115,28 +121,30 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    public String timesLeft (Timestamp deadline) {
-        LocalDateTime deadlineTime = deadline.toLocalDateTime();
-        LocalDate deadlineDate = deadline.toLocalDateTime().toLocalDate();
-        // Получаем текущее время
+    public String timesLeft (LocalDateTime deadline) {
+
+        LocalDate deadlineDate = deadline.toLocalDate();
+
         LocalDateTime currentTime = LocalDateTime.now();
         LocalDate currentDate = LocalDate.now();
-        Duration timesLeft = Duration.between(currentTime, deadlineTime);
-        Period datesLeft = Period.between(currentDate, deadlineDate);
-        long days = timesLeft.toDays();
-        long hours = timesLeft.toHours();
-        long minutes = timesLeft.toMinutes();
+        Duration timesLeft = Duration.between(currentTime, deadline);
 
         Period period = Period.between(currentDate, deadlineDate);
 
-        return "Осталось: " + period.getYears() + " лет, " + period.getMonths() + " месяцев, " + days + " дней, " + hours + "часов, " + minutes + "минут";
+        long years = period.getYears();
+        long months = period.getMonths();
+        long days = timesLeft.toDays();
+        long hours = timesLeft.toHoursPart();
+        long minutes = timesLeft.toMinutesPart();
+
+        return "Осталось: " + years + " лет, " + months + " месяцев, " + days + " дней, " + hours + " часов, " + minutes + " минут";
     }
 
-    public Timestamp parseToTimestamp(String timestamp) {
+    public LocalDateTime parseToLocalDateTime(String text) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
         try {
-            LocalDateTime localDateTime = LocalDateTime.parse(timestamp, formatter);
-            return Timestamp.valueOf(localDateTime);
+            LocalDateTime localDateTime = LocalDateTime.parse(text, formatter);
+            return localDateTime;
         }
         catch (Exception e) {
             System.out.println("Error: " + e.getMessage());
@@ -144,7 +152,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    public boolean isValidTimestamp(String timestamp) {
+    public boolean isValidLocalDateTime(String timestamp) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
         try {
             LocalDateTime.parse(timestamp, formatter);

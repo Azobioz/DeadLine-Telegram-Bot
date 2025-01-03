@@ -8,6 +8,7 @@ import org.telegrambot.model.TelegramUser;
 
 
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -19,7 +20,7 @@ public class TaskDto {
     private long id;
 
     private String name;
-    private Timestamp deadline;
+    private LocalDateTime deadline;
     private TelegramUser user;
 
 }

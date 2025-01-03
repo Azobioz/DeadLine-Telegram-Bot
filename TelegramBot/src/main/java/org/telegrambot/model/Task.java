@@ -9,6 +9,7 @@ import org.hibernate.validator.constraints.Length;
 
 import javax.validation.constraints.NotNull;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -22,7 +23,7 @@ public class Task {
     private long id;
     @Length(max=250)
     private String name;
-    private Timestamp deadline;
+    private LocalDateTime deadline;
     @ManyToOne
     @NotNull
     private TelegramUser user;
