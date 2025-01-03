@@ -76,13 +76,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         case "/create":
                             register(username);
                             sendMessage(chatId, "Введите дату (день-месяц-год час:минута)");
-                            if (parseToLocalDateTime(text).isBefore(LocalDateTime.now())) {
-                                sendMessage(chatId, "");
-                                userStates.put(chatId, BotState.IDLE);
-                            }
-                            else {
-                                userStates.put(chatId, BotState.AWAITING_DATE);
-                            }
+                            userStates.put(chatId, BotState.AWAITING_DATE);
                             break;
                         case "/check":
                             List<TaskDto> list = taskService.getAllTasksByUser(userDto);
@@ -95,16 +89,20 @@ public class TelegramBot extends TelegramLongPollingBot {
                     break;
 
                 case AWAITING_DATE:
-                    if (isValidLocalDateTime(text)) {
+                    if (parseToLocalDateTime(text) == null) {
+                        sendMessage(chatId, "Неверный формат данных");
+                        userStates.put(chatId, BotState.IDLE);
+                    }
+                    if (parseToLocalDateTime(text).isBefore(LocalDateTime.now())) {
+                        sendMessage(chatId, "Дата меньше текущей даты");
+                        userStates.put(chatId, BotState.IDLE);
+                    }
+                    else if (isValidLocalDateTime(text)) {
                         taskDto.setDeadline(parseToLocalDateTime(text));
                         taskDto.setUser(mapToTelegramUser(userDto));
                         userDto.addTask(taskDto);
                         sendMessage(chatId, "Введите название задачи");
                         userStates.put(chatId, BotState.AWAITING_NAME);
-                    }
-                    else {
-                        sendMessage(chatId, "Неверный формат данных");
-                        userStates.put(chatId, BotState.IDLE);
                     }
                     break;
 
@@ -143,8 +141,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     public LocalDateTime parseToLocalDateTime(String text) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
         try {
-            LocalDateTime localDateTime = LocalDateTime.parse(text, formatter);
-            return localDateTime;
+            return LocalDateTime.parse(text, formatter);
         }
         catch (Exception e) {
             System.out.println("Error: " + e.getMessage());
