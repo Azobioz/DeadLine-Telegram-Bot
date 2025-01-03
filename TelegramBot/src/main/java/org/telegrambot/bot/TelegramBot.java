@@ -15,12 +15,16 @@ import org.telegrambot.service.TaskService;
 import org.telegrambot.service.TelegramUserService;
 
 import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.telegrambot.mapper.TelegramUserMapper.mapToTelegramUser;
 
@@ -74,6 +78,13 @@ public class TelegramBot extends TelegramLongPollingBot {
                             sendMessage(chatId, "Введите дату (день-месяц-год час:минута)");
                             userStates.put(chatId, BotState.AWAITING_DATE);
                             break;
+                        case "/check":
+                            List<TaskDto> list = taskService.getAllTasksByUser(userDto);
+                            for (TaskDto taskDto : list) {
+                                sendMessage(chatId, taskDto.getName() + "\n" + timesLeft(taskDto.getDeadline()));
+                            }
+
+
                     }
                     break;
 
@@ -102,6 +113,23 @@ public class TelegramBot extends TelegramLongPollingBot {
 
 
         }
+    }
+
+    public String timesLeft (Timestamp deadline) {
+        LocalDateTime deadlineTime = deadline.toLocalDateTime();
+        LocalDate deadlineDate = deadline.toLocalDateTime().toLocalDate();
+        // Получаем текущее время
+        LocalDateTime currentTime = LocalDateTime.now();
+        LocalDate currentDate = LocalDate.now();
+        Duration timesLeft = Duration.between(currentTime, deadlineTime);
+        Period datesLeft = Period.between(currentDate, deadlineDate);
+        long days = timesLeft.toDays();
+        long hours = timesLeft.toHours();
+        long minutes = timesLeft.toMinutes();
+
+        Period period = Period.between(currentDate, deadlineDate);
+
+        return "Осталось: " + period.getYears() + " лет, " + period.getMonths() + " месяцев, " + days + " дней, " + hours + "часов, " + minutes + "минут";
     }
 
     public Timestamp parseToTimestamp(String timestamp) {
