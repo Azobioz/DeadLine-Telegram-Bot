@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegrambot.dto.TaskDto;
 import org.telegrambot.dto.TelegramUserDto;
+import org.telegrambot.model.Task;
 import org.telegrambot.repository.TaskRepository;
 import org.telegrambot.service.TaskService;
 
@@ -38,7 +39,16 @@ public class TaskServiceImpl implements TaskService {
     @Override
 
     public List<TaskDto> getAllTasksByUser(TelegramUserDto user) {
-       List<TaskDto> list =  taskRepository.getTasksByUser(mapToTelegramUser(user)).stream().map(task -> mapToTaskDto(task)).collect(Collectors.toList());
+       List<TaskDto> list =  taskRepository.getTasksByUser(mapToTelegramUser(user))
+               .stream()
+               .map(task -> mapToTaskDto(task)).collect(Collectors.toList());
        return list;
     }
+
+    @Override
+    public void deleteTask(TaskDto taskDto) {
+        Task task = mapToTask(taskDto);
+        taskRepository.delete(task);
+    }
+
 }
