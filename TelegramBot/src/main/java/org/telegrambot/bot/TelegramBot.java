@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.telegrambot.mapper.TelegramUserMapper.mapToTelegramUser;
 
@@ -83,7 +82,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                             for (TaskDto taskDto : list) {
                                 sendMessage(chatId, taskDto.getName() + "\n" + timesLeft(taskDto.getDeadline()));
                             }
-
 
                     }
                     break;

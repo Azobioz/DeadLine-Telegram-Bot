@@ -11,4 +11,5 @@ public interface TaskService {
     void saveTask(TaskDto taskDto);
     TaskDto findTaskById(long id);
     List<TaskDto> getAllTasksByUser(TelegramUserDto userDto);
+    void deleteTask(TaskDto taskDto);
 }
