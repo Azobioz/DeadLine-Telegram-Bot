@@ -42,6 +42,8 @@ public class TelegramBot extends TelegramLongPollingBot {
         this.taskService = taskService;
         List<BotCommand> listOfCommands = new ArrayList<>();
         listOfCommands.add(new BotCommand("/start", "about this bot"));
+        listOfCommands.add(new BotCommand("/create", "create task"));
+        listOfCommands.add(new BotCommand("/check", "check all tasks"));
         try {
             this.execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
         }
