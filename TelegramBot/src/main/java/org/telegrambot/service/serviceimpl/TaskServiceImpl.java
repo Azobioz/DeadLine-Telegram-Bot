@@ -32,8 +32,8 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public TaskDto findTaskById(long id) {
-        return mapToTaskDto(taskRepository.findById(id).get());
+    public TaskDto getTaskByName(String taskName) {
+        return mapToTaskDto(taskRepository.getTaskByName(taskName));
     }
 
     @Override
@@ -45,10 +45,16 @@ public class TaskServiceImpl implements TaskService {
        return list;
     }
 
+    @Transactional
     @Override
     public void deleteTask(TaskDto taskDto) {
-        Task task = mapToTask(taskDto);
-        taskRepository.delete(task);
+        Task task = taskRepository.getTaskByName(taskDto.getName());
+        if (task == null) {
+            System.out.println("Удаление не произошло т.к. " + task.getName() + " нет");
+        }
+        else {
+            taskRepository.delete(task);
+        }
     }
 
 }

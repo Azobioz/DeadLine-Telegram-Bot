@@ -12,5 +12,6 @@ import java.util.List;
 @Repository
 public interface TaskRepository extends JpaRepository<Task, Long> {
     @Transactional
+    Task getTaskByName(String taskName);
     List<Task> getTasksByUser(TelegramUser user);
 }
