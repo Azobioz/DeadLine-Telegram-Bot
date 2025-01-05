@@ -70,8 +70,8 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
         if (update.hasMessage() && update.getMessage().hasText()) {
             long chatId = update.getMessage().getChatId();
-            String text = update.getMessage().getText();
             BotState state = userStates.getOrDefault(chatId, BotState.IDLE);
+            String text = update.getMessage().getText();
             String username = update.getMessage().getFrom().getUserName();
             handleMessage(chatId, text, state, username);
         }
@@ -133,8 +133,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                 taskDto.setName(text);
                 userDto.addTask(taskDto);
                 taskService.saveTask(taskDto);
-                sendMessage(chatId, "Задача добавлена");
-                userStates.put(chatId, BotState.IDLE);
+                textUnderMessage(chatId, "Задача добавлена. Хотите создать еще одну задачу?");
+                userStates.put(chatId, BotState.AWAITING_YES_OR_NO);
                 break;
 
             case AWAITING_TASK_NAME_TO_DELETE:
@@ -145,10 +145,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                 }
                 else {
                     taskService.deleteTask(taskToDelete);
-                    deleteNewTaskMessage(chatId);
+                    textUnderMessage(chatId, "Задача удалена, удалить еще одну?");
                     userStates.put(chatId, BotState.AWAITING_YES_OR_NO);
                     break;
                 }
+
         }
 
     }
@@ -159,8 +160,14 @@ public class TelegramBot extends TelegramLongPollingBot {
         Integer messageId = callbackQuery.getMessage().getMessageId();
 
         if (callbackData.equals(YES_BUTTON)) {
-            executeEditedMessage(chatId, "Введите название задачи", messageId);
-            userStates.put(chatId, BotState.AWAITING_TASK_NAME_TO_DELETE);
+            if (userStates.get(chatId).equals(BotState.AWAITING_YES_OR_NO)) {
+                executeEditedMessage(chatId, "Введите дату (день-месяц-год час:минута)", messageId);
+                userStates.put(chatId, BotState.AWAITING_DATE);
+            }
+            else {
+                executeEditedMessage(chatId, "Введите название задачи", messageId);
+                userStates.put(chatId, BotState.AWAITING_TASK_NAME_TO_DELETE);
+            }
         } else if (callbackData.equals(NO_BUTTON)) {
             userStates.put(chatId, BotState.IDLE);
             executeEditedMessage(chatId, "Хорошего дня", messageId);
@@ -187,11 +194,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
 
-    private void deleteNewTaskMessage(Long chatId) {
+    private void textUnderMessage(Long chatId, String text) {
 
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
-        message.setText("Задача удалена, удалить еще одну?");
+        message.setText(text);
 
         InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup(); //Встроенная разметка клавиатуры
         List<List<InlineKeyboardButton>> rowsInLine = getButtonsUnderMessage();
