@@ -82,24 +82,24 @@ public class TelegramBot extends TelegramLongPollingBot {
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
 
-        TelegramUserDto userDto = userService.findTelegramUserByUsername(username);
+        TelegramUserDto userDto = userService.getTelegramUserByUsername(username);
 
         switch (currentState) {
             case IDLE:
                 switch (text) {
                     case "/start":
                         startCommandReceived(chatId, username);
-                        register(username);
+                        register(username, chatId);
                         break;
                     case "/create":
-                        register(username);
+                        register(username, chatId);
                         sendMessage(chatId, "Введите дату (день-месяц-год час:минута)");
                         userStates.put(chatId, BotState.AWAITING_DATE);
                         break;
                     case "/check":
                         List<TaskDto> list = taskService.getAllTasksByUser(userDto);
                         for (TaskDto taskDto : list) {
-                            sendMessage(chatId, taskDto.getName() + "\n" + timesLeft(taskDto.getDeadline()));
+                            sendMessage(chatId, taskDto.getName() + "\n" + timesLeft(taskDto.getDeadline(), chatId));
                         }
                         break;
                     case "/delete":
@@ -117,7 +117,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     sendMessage(chatId, "Неверный формат данных");
                     userStates.put(chatId, BotState.IDLE);
                 }
-                if (parseToLocalDateTime(text).isBefore(LocalDateTime.now())) {
+                else if (parseToLocalDateTime(text).isBefore(LocalDateTime.now())) {
                     sendMessage(chatId, "Дата меньше текущей даты");
                     userStates.put(chatId, BotState.IDLE);
                 } else if (isValidLocalDateTime(text)) {
@@ -257,12 +257,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         executeMessage(message);
     }
 
-    public String timesLeft (LocalDateTime deadline) {
-
+    public String timesLeft(LocalDateTime deadline, long chatId) {
 
         LocalDateTime currentTime = LocalDateTime.now();
         Duration duration = Duration.between(currentTime, deadline);
-        
+
         Period period = Period.between(currentTime.toLocalDate(), deadline.toLocalDate());
 
         long years = period.getYears();
@@ -306,16 +305,17 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    public void register(String username) {
-        if (userService.findTelegramUserByUsername(username) == null) {
+    public void register(String username, long chatId) {
+        if (userService.getTelegramUserByUsername(username) == null) {
             TelegramUserDto userDto = new TelegramUserDto();
             userDto.setUsername(username);
+            userDto.setId(chatId);
             userService.saveTelegramUser(userDto);
         }
     }
 
     private void startCommandReceived(long chatId, String username) {
-        String text = "Hi " + username + ", this is a bot for task management ";
+        String text = "Здраствуй " + username + ", это бот, который позволяет создать заметки с фиксированным сроком";
         sendMessage(chatId, text);
     }
 

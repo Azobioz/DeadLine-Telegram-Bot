@@ -2,8 +2,11 @@ package org.telegrambot.service;
 
 import org.telegrambot.dto.TelegramUserDto;
 
+import java.util.List;
+
 public interface TelegramUserService {
 
-    TelegramUserDto findTelegramUserByUsername(String username);
+    TelegramUserDto getTelegramUserByUsername(String username);
     void saveTelegramUser(TelegramUserDto userDto);
+    List<TelegramUserDto> getAllTelegramUsers();
 }
