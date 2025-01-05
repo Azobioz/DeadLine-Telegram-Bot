@@ -6,7 +6,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.telegrambot.dto.TaskDto;
 import org.telegrambot.dto.TelegramUserDto;
 import org.telegrambot.model.Task;
+import org.telegrambot.model.TelegramUser;
 import org.telegrambot.repository.TaskRepository;
+import org.telegrambot.repository.UserRepository;
 import org.telegrambot.service.TaskService;
 
 import java.util.List;
@@ -19,11 +21,13 @@ import static org.telegrambot.mapper.TelegramUserMapper.mapToTelegramUser;
 @Service
 public class TaskServiceImpl implements TaskService {
 
+    private final UserRepository userRepository;
     private TaskRepository taskRepository;
 
     @Autowired
-    public TaskServiceImpl(TaskRepository taskRepository) {
+    public TaskServiceImpl(TaskRepository taskRepository, UserRepository userRepository) {
         this.taskRepository = taskRepository;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -49,6 +53,9 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public void deleteTask(TaskDto taskDto) {
         Task task = taskRepository.getTaskByName(taskDto.getName());
+        TelegramUser user = userRepository.findTelegramUserByUsername(task.getUser().getUsername());
+        user.deleteTask(task);
+        userRepository.save(user);
         if (task == null) {
             System.out.println("Удаление не произошло т.к. " + task.getName() + " нет");
         }

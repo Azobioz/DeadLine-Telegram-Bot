@@ -2,8 +2,10 @@ package org.telegrambot.bot;
 
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
@@ -51,6 +53,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         listOfCommands.add(new BotCommand("/start", "about this bot"));
         listOfCommands.add(new BotCommand("/create", "create task"));
         listOfCommands.add(new BotCommand("/check", "check all tasks"));
+        listOfCommands.add(new BotCommand("/delete", "delete tasks"));
         try {
             this.execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
         }
@@ -61,97 +64,128 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+        if (update.hasCallbackQuery()) {
+            handleCallbackQuery(update.getCallbackQuery());
+            return;
+        }
         if (update.hasMessage() && update.getMessage().hasText()) {
-
             long chatId = update.getMessage().getChatId();
             String text = update.getMessage().getText();
-
-            BotState currentState = userStates.getOrDefault(chatId, BotState.IDLE);
-
-            SendMessage message = new SendMessage();
-            message.setChatId(chatId);
-            String username = update.getMessage().getChat().getUserName();
-
-            TelegramUserDto userDto = userService.findTelegramUserByUsername(username);
-
-            switch (currentState) {
-                case IDLE:
-                    switch (text) {
-                        case "/start":
-                            startCommandReceived(chatId, username);
-                            register(username);
-                            break;
-                        case "/create":
-                            register(username);
-                            sendMessage(chatId, "Введите дату (день-месяц-год час:минута)");
-                            userStates.put(chatId, BotState.AWAITING_DATE);
-                            break;
-                        case "/check":
-                            List<TaskDto> list = taskService.getAllTasksByUser(userDto);
-                            for (TaskDto taskDto : list) {
-                                sendMessage(chatId, taskDto.getName() + "\n" + timesLeft(taskDto.getDeadline()));
-                            }
-                            break;
-                        case "/delete":
-                            sendMessage(chatId, "Введите название задачи", userDto);
-                            userStates.put(chatId, BotState.AWAITING_TASK_NAME_TO_DELETE);
-                            break;
-                    }
-                    break;
-
-                case AWAITING_DATE:
-                    if (parseToLocalDateTime(text) == null) {
-                        sendMessage(chatId, "Неверный формат данных");
-                        userStates.put(chatId, BotState.IDLE);
-                    }
-                    if (parseToLocalDateTime(text).isBefore(LocalDateTime.now())) {
-                        sendMessage(chatId, "Дата меньше текущей даты");
-                        userStates.put(chatId, BotState.IDLE);
-                    }
-                    else if (isValidLocalDateTime(text)) {
-                        taskDto.setDeadline(parseToLocalDateTime(text));
-                        taskDto.setUser(mapToTelegramUser(userDto));
-                        userDto.addTask(taskDto);
-                        sendMessage(chatId, "Введите название задачи");
-                        userStates.put(chatId, BotState.AWAITING_NAME);
-                    }
-                    break;
-
-                case AWAITING_NAME:
-                    taskDto.setName(text);
-                    userDto.addTask(taskDto);
-                    taskService.saveTask(taskDto);
-                    sendMessage(chatId, "Задача добавлена");
-                    userStates.put(chatId, BotState.IDLE);
-                    break;
-
-                case AWAITING_TASK_NAME_TO_DELETE:
-                    TaskDto taskToDelete = taskService.getTaskByName(text);
-                    if (taskToDelete == null) {
-                        sendMessage(chatId, "Задачи с таким названием нет");
-                        userStates.put(chatId, BotState.IDLE);
-                    }
-                    else {
-                        taskService.deleteTask(taskToDelete);
-                        deleteNewTaskMessage(chatId);
-                        userStates.put(chatId, BotState.AWAITING_YES_OR_NO);
-                    }
-                    break;
-
-                case AWAITING_YES_OR_NO:
-                    if (update.getCallbackQuery().getData().equals(YES_BUTTON)) {
-                        text = "/delete";
-                        userStates.put(chatId, BotState.IDLE);
-                    }
-                    else {
-                        userStates.put(chatId, BotState.IDLE);
-                    }
-                    break;
-            }
-
-
+            BotState state = userStates.getOrDefault(chatId, BotState.IDLE);
+            String username = update.getMessage().getFrom().getUserName();
+            handleMessage(chatId, text, state, username);
         }
     }
+
+    private void handleMessage(long chatId, String text, BotState currentState, String username) {
+
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId);
+
+        TelegramUserDto userDto = userService.findTelegramUserByUsername(username);
+
+        switch (currentState) {
+            case IDLE:
+                switch (text) {
+                    case "/start":
+                        startCommandReceived(chatId, username);
+                        register(username);
+                        break;
+                    case "/create":
+                        register(username);
+                        sendMessage(chatId, "Введите дату (день-месяц-год час:минута)");
+                        userStates.put(chatId, BotState.AWAITING_DATE);
+                        break;
+                    case "/check":
+                        List<TaskDto> list = taskService.getAllTasksByUser(userDto);
+                        for (TaskDto taskDto : list) {
+                            sendMessage(chatId, taskDto.getName() + "\n" + timesLeft(taskDto.getDeadline()));
+                        }
+                        break;
+                    case "/delete":
+                        sendMessage(chatId, "Введите название задачи", userDto);
+                        userStates.put(chatId, BotState.AWAITING_TASK_NAME_TO_DELETE);
+                        break;
+                    default:
+                        sendMessage(chatId, "Нет такой команды");
+                        break;
+                }
+                break;
+
+            case AWAITING_DATE:
+                if (parseToLocalDateTime(text) == null) {
+                    sendMessage(chatId, "Неверный формат данных");
+                    userStates.put(chatId, BotState.IDLE);
+                }
+                if (parseToLocalDateTime(text).isBefore(LocalDateTime.now())) {
+                    sendMessage(chatId, "Дата меньше текущей даты");
+                    userStates.put(chatId, BotState.IDLE);
+                } else if (isValidLocalDateTime(text)) {
+                    taskDto.setDeadline(parseToLocalDateTime(text));
+                    taskDto.setUser(mapToTelegramUser(userDto));
+                    userDto.addTask(taskDto);
+                    sendMessage(chatId, "Введите название задачи");
+                    userStates.put(chatId, BotState.AWAITING_NAME);
+                }
+                break;
+
+            case AWAITING_NAME:
+                taskDto.setName(text);
+                userDto.addTask(taskDto);
+                taskService.saveTask(taskDto);
+                sendMessage(chatId, "Задача добавлена");
+                userStates.put(chatId, BotState.IDLE);
+                break;
+
+            case AWAITING_TASK_NAME_TO_DELETE:
+                TaskDto taskToDelete = taskService.getTaskByName(text);
+                if (taskToDelete == null) {
+                    sendMessage(chatId, "Задачи с таким названием нет");
+                    userStates.put(chatId, BotState.IDLE);
+                }
+                else {
+                    taskService.deleteTask(taskToDelete);
+                    deleteNewTaskMessage(chatId);
+                    userStates.put(chatId, BotState.AWAITING_YES_OR_NO);
+                    break;
+                }
+        }
+
+    }
+
+    private void handleCallbackQuery(CallbackQuery callbackQuery) {
+        String callbackData = callbackQuery.getData();
+        long chatId = callbackQuery.getMessage().getChatId();
+        Integer messageId = callbackQuery.getMessage().getMessageId();
+
+        if (callbackData.equals(YES_BUTTON)) {
+            executeEditedMessage(chatId, "Введите название задачи", messageId);
+            userStates.put(chatId, BotState.AWAITING_TASK_NAME_TO_DELETE);
+        } else if (callbackData.equals(NO_BUTTON)) {
+            userStates.put(chatId, BotState.IDLE);
+            executeEditedMessage(chatId, "Хорошего дня", messageId);
+        }
+        try {
+            execute(new AnswerCallbackQuery(callbackQuery.getId()));
+        }
+        catch (TelegramApiException e) {
+            System.err.println("Error: " + e.getMessage());
+        }
+    }
+
+    private void executeEditedMessage(Long chatId, String text, Integer messageId) {
+        EditMessageText editedMessageText = new EditMessageText();
+        editedMessageText.setChatId(chatId);
+        editedMessageText.setText(text);
+        editedMessageText.setMessageId(messageId);
+        try {
+            execute(editedMessageText);
+        }
+        catch (TelegramApiException e) {
+            System.out.println("Error in executeEditedMessage: " + e);
+        }
+    }
+
 
     private void deleteNewTaskMessage(Long chatId) {
 
@@ -160,7 +194,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         message.setText("Задача удалена, удалить еще одну?");
 
         InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup(); //Встроенная разметка клавиатуры
-        List<List<InlineKeyboardButton>> rowsInLine = getButtonUnderMessage();
+        List<List<InlineKeyboardButton>> rowsInLine = getButtonsUnderMessage();
 
         markupInline.setKeyboard(rowsInLine);
         message.setReplyMarkup(markupInline); // когда будет отправлено юзеру, то он получит кнопки под текстом
@@ -168,7 +202,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         executeMessage(message);
     }
 
-    private static List<List<InlineKeyboardButton>> getButtonUnderMessage() {
+    private static List<List<InlineKeyboardButton>> getButtonsUnderMessage() {
         List<List<InlineKeyboardButton>> rowsInLine = new ArrayList<>(); //Список строк кнопок под текстом
         List<InlineKeyboardButton> rowInline = new ArrayList<>(); //строка кнопок
         InlineKeyboardButton yesButton = new InlineKeyboardButton(); //кнопка

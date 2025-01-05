@@ -34,4 +34,9 @@ public class TelegramUser {
         tasks.add(task);
         task.setUser(this);
     }
+
+    public void deleteTask(Task task) {
+        tasks.remove(task);
+        task.setUser(null);
+    }
 }
