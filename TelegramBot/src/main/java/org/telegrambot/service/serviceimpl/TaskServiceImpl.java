@@ -37,16 +37,18 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public TaskDto getTaskByName(String taskName) {
+        if (taskRepository.getTaskByName(taskName) == null) {
+            return null;
+        }
         return mapToTaskDto(taskRepository.getTaskByName(taskName));
     }
 
     @Override
 
     public List<TaskDto> getAllTasksByUser(TelegramUserDto user) {
-       List<TaskDto> list =  taskRepository.getTasksByUser(mapToTelegramUser(user))
+        return taskRepository.getTasksByUser(mapToTelegramUser(user))
                .stream()
                .map(task -> mapToTaskDto(task)).collect(Collectors.toList());
-       return list;
     }
 
     @Transactional
@@ -56,12 +58,8 @@ public class TaskServiceImpl implements TaskService {
         TelegramUser user = userRepository.findTelegramUserByUsername(task.getUser().getUsername());
         user.deleteTask(task);
         userRepository.save(user);
-        if (task == null) {
-            System.out.println("Удаление не произошло т.к. " + task.getName() + " нет");
-        }
-        else {
-            taskRepository.delete(task);
-        }
+        taskRepository.delete(task);
+
     }
 
 }

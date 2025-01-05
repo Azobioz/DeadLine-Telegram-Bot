@@ -146,7 +146,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                 else {
                     taskService.deleteTask(taskToDelete);
                     textUnderMessage(chatId, "Задача удалена, удалить еще одну?");
-                    userStates.put(chatId, BotState.AWAITING_YES_OR_NO);
                     break;
                 }
 
@@ -260,19 +259,26 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     public String timesLeft (LocalDateTime deadline) {
 
-        LocalDate deadlineDate = deadline.toLocalDate();
 
         LocalDateTime currentTime = LocalDateTime.now();
-        LocalDate currentDate = LocalDate.now();
-        Duration timesLeft = Duration.between(currentTime, deadline);
-
-        Period period = Period.between(currentDate, deadlineDate);
+        Duration duration = Duration.between(currentTime, deadline);
+        
+        Period period = Period.between(currentTime.toLocalDate(), deadline.toLocalDate());
 
         long years = period.getYears();
         long months = period.getMonths();
-        long days = timesLeft.toDays();
-        long hours = timesLeft.toHoursPart();
-        long minutes = timesLeft.toMinutesPart();
+        long days = period.getDays();
+
+        if (months > 0) {
+            days = deadline.toLocalDate().getDayOfMonth() - currentTime.toLocalDate().getDayOfMonth();
+            if (days < 0) {
+                LocalDate previousMonth = deadline.toLocalDate().minusMonths(1);
+                days += previousMonth.lengthOfMonth();
+                months--;
+            }
+        }
+        long hours = duration.toHoursPart();
+        long minutes = duration.toMinutesPart();
 
         return "Осталось: " + years + " лет, " + months + " месяцев, " + days + " дней, " + hours + " часов, " + minutes + " минут";
     }
