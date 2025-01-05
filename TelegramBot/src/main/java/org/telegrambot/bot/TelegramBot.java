@@ -49,6 +49,8 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     static final String YES_BUTTON = "YES_BUTTON";
     static final String NO_BUTTON = "NO_BUTTON";
+    private boolean isDeadlineIsOneDay;
+    private boolean isDeadlineIsTwelveHours;
 
     public TelegramBot(BotConfig config, TelegramUserService userService, TaskService taskService) {
         this.config = config;
@@ -295,11 +297,13 @@ public class TelegramBot extends TelegramLongPollingBot {
         long minutes = duration.toMinutesPart();
 
 
-        if (years == 0 && months == 0 && days == 0 && hours < 24 && hours > 12 && minutes == 0) {
+        if (years == 0 && months == 0 && days == 0 && hours < 24 && hours > 12 && !isDeadlineIsOneDay) {
             sendMessage(chatId, "Осталось меньше дня до дедлайна задачи " + taskDto.getName());
+            isDeadlineIsOneDay = true;
         }
-        else if (years == 0 && months == 0 && days == 0 && hours < 12 && hours > 5 && minutes == 0) {
+        else if (years == 0 && months == 0 && days == 0 && hours < 12 && hours > 5 && !isDeadlineIsTwelveHours) {
             sendMessage(chatId, "Осталось меньше 12 часов до дедлайна задачи " + taskDto.getName());
+            isDeadlineIsTwelveHours = true;
         }
     }
 
