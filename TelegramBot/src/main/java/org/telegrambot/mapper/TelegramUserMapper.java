@@ -13,6 +13,7 @@ public class TelegramUserMapper {
         return TelegramUser.builder()
                 .id(userDto.getId())
                 .username(userDto.getUsername())
+                .chatId(userDto.getChatId())
                 .build();
     }
 
@@ -20,6 +21,7 @@ public class TelegramUserMapper {
         return TelegramUserDto.builder()
                 .id(user.getId())
                 .username(user.getUsername())
+                .chatId(user.getChatId())
                 .tasksDto(user.getTasks().stream().map(task -> mapToTaskDto(task)).collect(Collectors.toList()))
                 .build();
     }

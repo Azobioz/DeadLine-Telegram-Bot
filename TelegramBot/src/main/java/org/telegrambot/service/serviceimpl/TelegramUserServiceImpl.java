@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegrambot.dto.TelegramUserDto;
+import org.telegrambot.model.TelegramUser;
 import org.telegrambot.repository.UserRepository;
 import org.telegrambot.service.TelegramUserService;
 
@@ -26,6 +27,10 @@ public class TelegramUserServiceImpl implements TelegramUserService {
     @Override
     @Transactional
     public TelegramUserDto getTelegramUserByUsername(String username) {
+        TelegramUser user = userRepository.findTelegramUserByUsername(username);
+        if (user == null) {
+            return null;
+        }
         return mapToTelegramUserDto(userRepository.findTelegramUserByUsername(username));
     }
 
@@ -35,6 +40,7 @@ public class TelegramUserServiceImpl implements TelegramUserService {
     }
 
     @Override
+    @Transactional
     public List<TelegramUserDto> getAllTelegramUsers() {
         return userRepository.findAll().stream().map(user -> mapToTelegramUserDto(user)).collect(Collectors.toList());
     }

@@ -1,5 +1,6 @@
 package org.telegrambot.bot;
 
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
@@ -30,6 +31,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static org.telegrambot.mapper.TelegramUserMapper.mapToTelegramUser;
 
@@ -41,6 +45,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     TaskDto taskDto = new TaskDto();
     TaskService taskService;
     TelegramUserService userService;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     static final String YES_BUTTON = "YES_BUTTON";
     static final String NO_BUTTON = "NO_BUTTON";
@@ -62,19 +67,34 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    @Scheduled(cron = "${cron.scheduler}")
+    private void checkDeadlines() {
+        List<TelegramUserDto> users = userService.getAllTelegramUsers();
+        for (TelegramUserDto user : users) {
+            List<TaskDto> tasks = taskService.getAllTasksByUser(user);
+            for (TaskDto task : tasks) {
+                isLittleTimeLeft(task, user.getChatId(), task.getDeadline());
+            }
+        }
+    }
+
+
+
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasCallbackQuery()) {
             handleCallbackQuery(update.getCallbackQuery());
             return;
         }
+        long chatId = update.getMessage().getChatId();
+        String username = update.getMessage().getFrom().getUserName();
+        register(username, chatId);
         if (update.hasMessage() && update.getMessage().hasText()) {
-            long chatId = update.getMessage().getChatId();
             BotState state = userStates.getOrDefault(chatId, BotState.IDLE);
             String text = update.getMessage().getText();
-            String username = update.getMessage().getFrom().getUserName();
             handleMessage(chatId, text, state, username);
         }
+
     }
 
     private void handleMessage(long chatId, String text, BotState currentState, String username) {
@@ -89,17 +109,15 @@ public class TelegramBot extends TelegramLongPollingBot {
                 switch (text) {
                     case "/start":
                         startCommandReceived(chatId, username);
-                        register(username, chatId);
                         break;
                     case "/create":
-                        register(username, chatId);
                         sendMessage(chatId, "Введите дату (день-месяц-год час:минута)");
                         userStates.put(chatId, BotState.AWAITING_DATE);
                         break;
                     case "/check":
                         List<TaskDto> list = taskService.getAllTasksByUser(userDto);
                         for (TaskDto taskDto : list) {
-                            sendMessage(chatId, taskDto.getName() + "\n" + timesLeft(taskDto.getDeadline(), chatId));
+                            sendMessage(chatId, taskDto.getName() + "\n" + timesLeft(taskDto.getDeadline()));
                         }
                         break;
                     case "/delete":
@@ -257,7 +275,35 @@ public class TelegramBot extends TelegramLongPollingBot {
         executeMessage(message);
     }
 
-    public String timesLeft(LocalDateTime deadline, long chatId) {
+    public void isLittleTimeLeft(TaskDto taskDto, long chatId, LocalDateTime deadline) {
+        LocalDateTime currentTime = LocalDateTime.now();
+        Duration duration = Duration.between(currentTime, deadline);
+
+        Period period = Period.between(currentTime.toLocalDate(), deadline.toLocalDate());
+
+        long years = period.getYears();
+        long months = period.getMonths();
+        long days;
+
+        if (duration.toHours() < 24) {
+            days = 0;
+        }
+        else {
+            days = duration.toDays();
+        }
+        long hours = duration.toHoursPart();
+        long minutes = duration.toMinutesPart();
+
+
+        if (years == 0 && months == 0 && days == 0 && hours < 24 && hours > 12 && minutes == 0) {
+            sendMessage(chatId, "Осталось меньше дня до дедлайна задачи " + taskDto.getName());
+        }
+        else if (years == 0 && months == 0 && days == 0 && hours < 12 && hours > 5 && minutes == 0) {
+            sendMessage(chatId, "Осталось меньше 12 часов до дедлайна задачи " + taskDto.getName());
+        }
+    }
+
+    public String timesLeft(LocalDateTime deadline) {
 
         LocalDateTime currentTime = LocalDateTime.now();
         Duration duration = Duration.between(currentTime, deadline);
@@ -266,15 +312,13 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         long years = period.getYears();
         long months = period.getMonths();
-        long days = period.getDays();
+        long days;
 
-        if (months > 0) {
-            days = deadline.toLocalDate().getDayOfMonth() - currentTime.toLocalDate().getDayOfMonth();
-            if (days < 0) {
-                LocalDate previousMonth = deadline.toLocalDate().minusMonths(1);
-                days += previousMonth.lengthOfMonth();
-                months--;
-            }
+        if (duration.toHours() < 24) {
+            days = 0;
+        }
+        else {
+            days = duration.toDays();
         }
         long hours = duration.toHoursPart();
         long minutes = duration.toMinutesPart();
@@ -309,7 +353,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         if (userService.getTelegramUserByUsername(username) == null) {
             TelegramUserDto userDto = new TelegramUserDto();
             userDto.setUsername(username);
-            userDto.setId(chatId);
+            userDto.setChatId(chatId);
             userService.saveTelegramUser(userDto);
         }
     }
