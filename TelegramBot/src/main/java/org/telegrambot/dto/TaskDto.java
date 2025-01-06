@@ -6,8 +6,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.telegrambot.model.TelegramUser;
 
-
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
 @Data

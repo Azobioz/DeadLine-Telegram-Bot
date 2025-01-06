@@ -1,5 +1,6 @@
 package org.telegrambot.bot;
 
+import com.vdurmont.emoji.EmojiParser;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -23,7 +24,6 @@ import org.telegrambot.service.TaskService;
 import org.telegrambot.service.TelegramUserService;
 
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
 import java.time.format.DateTimeFormatter;
@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import static org.telegrambot.mapper.TelegramUserMapper.mapToTelegramUser;
 
@@ -49,8 +48,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     static final String YES_BUTTON = "YES_BUTTON";
     static final String NO_BUTTON = "NO_BUTTON";
-    private boolean isDeadlineIsOneDay;
-    private boolean isDeadlineIsTwelveHours;
+
 
     public TelegramBot(BotConfig config, TelegramUserService userService, TaskService taskService) {
         this.config = config;
@@ -80,8 +78,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
         }
     }
-
-
 
     @Override
     public void onUpdateReceived(Update update) {
@@ -114,65 +110,120 @@ public class TelegramBot extends TelegramLongPollingBot {
                         startCommandReceived(chatId, username);
                         break;
                     case "/create":
-                        sendMessage(chatId, "Введите дату (день-месяц-год час:минута)");
-                        userStates.put(chatId, BotState.AWAITING_DATE);
+                        createCommandReceived(chatId);
                         break;
                     case "/check":
-                        List<TaskDto> list = taskService.getAllTasksByUser(userDto);
-                        for (TaskDto taskDto : list) {
-                            sendMessage(chatId, taskDto.getName() + "\n" + timesLeft(taskDto.getDeadline()));
-                        }
+                        checkCommandReceived(chatId, userDto);
                         break;
                     case "/delete":
-                        sendMessage(chatId, "Введите название задачи", userDto);
-                        userStates.put(chatId, BotState.AWAITING_TASK_NAME_TO_DELETE);
+                        deleteCommandReceived(chatId, userDto);
                         break;
                     default:
-                        sendMessage(chatId, "Нет такой команды");
+                        unknownMessageReceived(chatId);
                         break;
                 }
                 break;
 
             case AWAITING_DATE:
-                if (parseToLocalDateTime(text) == null) {
-                    sendMessage(chatId, "Неверный формат данных");
-                    userStates.put(chatId, BotState.IDLE);
-                }
-                else if (parseToLocalDateTime(text).isBefore(LocalDateTime.now())) {
-                    sendMessage(chatId, "Дата меньше текущей даты");
-                    userStates.put(chatId, BotState.IDLE);
-                } else if (isValidLocalDateTime(text)) {
-                    taskDto.setDeadline(parseToLocalDateTime(text));
-                    taskDto.setUser(mapToTelegramUser(userDto));
-                    userDto.addTask(taskDto);
-                    sendMessage(chatId, "Введите название задачи");
-                    userStates.put(chatId, BotState.AWAITING_NAME);
-                }
+                awaitingDateBotStateReceived(chatId, userDto, text);
                 break;
 
             case AWAITING_NAME:
-                taskDto.setName(text);
-                userDto.addTask(taskDto);
-                taskService.saveTask(taskDto);
-                textUnderMessage(chatId, "Задача добавлена. Хотите создать еще одну задачу?");
-                userStates.put(chatId, BotState.AWAITING_YES_OR_NO);
+                awaitingNameBotStateReceived(chatId, userDto, text);
                 break;
 
             case AWAITING_TASK_NAME_TO_DELETE:
-                TaskDto taskToDelete = taskService.getTaskByName(text);
-                if (taskToDelete == null) {
-                    sendMessage(chatId, "Задачи с таким названием нет");
-                    userStates.put(chatId, BotState.IDLE);
-                }
-                else {
-                    taskService.deleteTask(taskToDelete);
-                    textUnderMessage(chatId, "Задача удалена, удалить еще одну?");
-                    break;
-                }
-
+                awaitingTaskNameToDeleteBotStateReceived(chatId, userDto, text);
+                break;
         }
 
+    }
 
+    private void awaitingTaskNameToDeleteBotStateReceived(long chatId, TelegramUserDto userDto, String text) {
+
+        TaskDto taskToDelete = taskService.getTaskByName(userDto, text);
+        if (taskToDelete == null) {
+            String mistakeMessage = EmojiParser.parseToUnicode(":x: Задачи с таким названием нет");
+            sendMessage(chatId, mistakeMessage);
+            userStates.put(chatId, BotState.IDLE);
+        }
+        else {
+            taskService.deleteTask(taskToDelete);
+            if (userService.getTelegramUserByUsername(userDto.getUsername()).getTasksDto().isEmpty()) {
+                String completedDeleteMessage = EmojiParser.parseToUnicode(":heavy_check_mark: Задача удалена");
+                sendMessage(chatId, completedDeleteMessage);
+            }
+            else {
+                String completedDeleteMessage = EmojiParser.parseToUnicode(":heavy_check_mark: Задача удалена, удалить еще одну?");
+                textUnderMessage(chatId, completedDeleteMessage);
+            }
+        }
+
+    }
+
+    private void awaitingNameBotStateReceived(long chatId, TelegramUserDto userDto, String text) {
+        taskDto.setName(text);
+        userDto.addTask(taskDto);
+        taskService.saveTask(taskDto);
+        String completeMessage = EmojiParser.parseToUnicode(":heavy_check_mark: Задача добавлена. Хотите создать еще одну задачу?");
+        textUnderMessage(chatId, completeMessage);
+        userStates.put(chatId, BotState.AWAITING_YES_OR_NO);
+    }
+
+    private void awaitingDateBotStateReceived(long chatId, TelegramUserDto userDto, String text) {
+        if (parseToLocalDateTime(text) == null) {
+            String mistakeMessage = EmojiParser.parseToUnicode(":x: Неверный формат данных");
+            sendMessage(chatId, mistakeMessage);
+            userStates.put(chatId, BotState.IDLE);
+        }
+        else if (parseToLocalDateTime(text).isBefore(LocalDateTime.now())) {
+            String mistakeMessage = EmojiParser.parseToUnicode(":x: Дата меньше текущей даты");
+            sendMessage(chatId, mistakeMessage);
+            userStates.put(chatId, BotState.IDLE);
+        }
+        else if (isValidLocalDateTime(text)) {
+            taskDto.setDeadline(parseToLocalDateTime(text));
+            taskDto.setUser(mapToTelegramUser(userDto));
+            userDto.addTask(taskDto);
+            String nameMessage = EmojiParser.parseToUnicode(":pencil: Введите название задачи");
+            sendMessage(chatId, nameMessage);
+            userStates.put(chatId, BotState.AWAITING_NAME);
+        }
+    }
+
+    private void unknownMessageReceived(long chatId) {
+        String defaultMessage = EmojiParser.parseToUnicode(":x: Нет такой команды");
+        sendMessage(chatId, defaultMessage);
+    }
+
+    private void deleteCommandReceived(long chatId, TelegramUserDto userDto) {
+        if (userDto.getTasksDto().isEmpty()) {
+            sendMessage(chatId, "У вас нет задач");
+        }
+        else {
+            String deleteMessage = EmojiParser.parseToUnicode(":pencil: Введите название задачи");
+            sendMessage(chatId, deleteMessage, userDto);
+            userStates.put(chatId, BotState.AWAITING_TASK_NAME_TO_DELETE);
+        }
+    }
+
+    private void checkCommandReceived(long chatId, TelegramUserDto userDto) {
+        List<TaskDto> list = taskService.getAllTasksByUser(userDto);
+        if (list.isEmpty()) {
+            sendMessage(chatId, "У вас еще нет задач");
+        }
+        else {
+            for (TaskDto taskDto : list) {
+                String checkMessage = EmojiParser.parseToUnicode(":date: " + taskDto.getName() + "\n" + timesLeft(taskDto.getDeadline()));
+                sendMessage(chatId, checkMessage);
+            }
+        }
+    }
+
+    private void createCommandReceived(long chatId) {
+        String createMessage = EmojiParser.parseToUnicode(":alarm_clock:  Введите дату (день-месяц-год час:минута) \n Например 01-05-2025 12:45");
+        sendMessage(chatId, createMessage);
+        userStates.put(chatId, BotState.AWAITING_DATE);
     }
 
     private void handleCallbackQuery(CallbackQuery callbackQuery) {
@@ -182,12 +233,15 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         if (callbackData.equals(YES_BUTTON)) {
             if (userStates.get(chatId).equals(BotState.AWAITING_YES_OR_NO)) {
-                executeEditedMessage(chatId, "Введите дату (день-месяц-год час:минута)", messageId);
+                String createMessage = EmojiParser.parseToUnicode(":alarm_clock:  Введите дату (день-месяц-год час:минута)");
+                executeEditedMessage(chatId, createMessage, messageId);
                 userStates.put(chatId, BotState.AWAITING_DATE);
             }
             else {
-                executeEditedMessage(chatId, "Введите название задачи", messageId);
+                String nameMessage = EmojiParser.parseToUnicode(":pencil: Введите название задачи");
+                executeEditedMessage(chatId, nameMessage, messageId);
                 userStates.put(chatId, BotState.AWAITING_TASK_NAME_TO_DELETE);
+
             }
         } else if (callbackData.equals(NO_BUTTON)) {
             userStates.put(chatId, BotState.IDLE);
@@ -220,7 +274,8 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         if (deadline.isBefore(currentTime) || deadline.equals(currentTime)) {
             taskService.deleteTask(taskDto);
-            sendMessage(taskDto.getUser().getChatId(), "Дедлайн задачи " + taskDto.getName() + " закончился");
+            String deadlineCompletedMessage = EmojiParser.parseToUnicode(":exclamation: Дедлайн задачи " + taskDto.getName() + " закончился");
+            sendMessage(taskDto.getUser().getChatId(), deadlineCompletedMessage);
         }
     }
 
@@ -302,19 +357,17 @@ public class TelegramBot extends TelegramLongPollingBot {
             days = 0;
         }
         else {
-            days = duration.toDays();
+            days = period.getDays();
         }
         long hours = duration.toHoursPart();
         long minutes = duration.toMinutesPart();
 
 
-        if (years == 0 && months == 0 && days == 0 && hours < 24 && hours > 12 && !isDeadlineIsOneDay) {
-            sendMessage(chatId, "Осталось меньше дня до дедлайна задачи " + taskDto.getName());
-            isDeadlineIsOneDay = true;
+        if (years == 0 && months == 0 && days == 1 && hours == 0 && minutes == 0) {
+            sendMessage(chatId, "Остался день до дедлайна задачи " + taskDto.getName());
         }
-        else if (years == 0 && months == 0 && days == 0 && hours < 12 && hours > 5 && !isDeadlineIsTwelveHours) {
-            sendMessage(chatId, "Осталось меньше 12 часов до дедлайна задачи " + taskDto.getName());
-            isDeadlineIsTwelveHours = true;
+        else if (years == 0 && months == 0 && days == 0 && hours == 12 && minutes == 0) {
+            sendMessage(chatId, "Осталось 12 часов до дедлайна задачи " + taskDto.getName());
         }
     }
 
@@ -333,12 +386,44 @@ public class TelegramBot extends TelegramLongPollingBot {
             days = 0;
         }
         else {
-            days = duration.toDays();
+            days = period.getDays();
         }
         long hours = duration.toHoursPart();
         long minutes = duration.toMinutesPart();
 
-        return "Осталось: " + years + " лет, " + months + " месяцев, " + days + " дней, " + hours + " часов, " + minutes + " минут";
+        String yearWord = "год";
+        String monthWord = "месяц";
+        String dayWord = "день";
+        String hourWord = "час";
+        String minutesWord = "минута";
+        if (years > 1 && years < 5) {
+            yearWord = "года";
+        }
+        else if (years > 4) {
+            yearWord = "лет";
+        }
+        if (months > 1 && months < 5) {
+            monthWord = "месяца";
+        }
+        else if (months > 4) {
+            monthWord = "месяцев";
+        }
+        if (days > 1 && days < 5) {
+            dayWord = "дня";
+        }
+        else if (days > 4) {
+            dayWord = "дней";
+        }
+        if (hours > 1) {
+            hourWord = "часа";
+        }
+        if (minutes > 1 && minutes < 5) {
+            minutesWord = "минуты";
+        }
+        else if (minutes > 4) {
+            minutesWord = "минут";
+        }
+        return "Осталось: " + years + " " + yearWord + ", " + months + " " + monthWord + ", " + days + " " + dayWord + ", " + hours + " " + hourWord + ", " + minutes + " " + minutesWord;
     }
 
     public LocalDateTime parseToLocalDateTime(String text) {
@@ -374,7 +459,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void startCommandReceived(long chatId, String username) {
-        String text = "Здраствуй " + username + ", это бот, который позволяет создать заметки с фиксированным сроком";
+        String text = EmojiParser.parseToUnicode("Здраствуй " + username + " :wave:, это бот, который позволяет создать заметки с фиксированным сроком");
         sendMessage(chatId, text);
     }
 

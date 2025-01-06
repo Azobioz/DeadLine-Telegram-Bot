@@ -22,7 +22,7 @@ import static org.telegrambot.mapper.TelegramUserMapper.mapToTelegramUser;
 public class TaskServiceImpl implements TaskService {
 
     private final UserRepository userRepository;
-    private TaskRepository taskRepository;
+    private final TaskRepository taskRepository;
 
     @Autowired
     public TaskServiceImpl(TaskRepository taskRepository, UserRepository userRepository) {
@@ -36,17 +36,20 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public TaskDto getTaskByName(String taskName) {
-        if (taskRepository.getTaskByName(taskName) == null) {
-            return null;
+    public TaskDto getTaskByName(TelegramUserDto userDto, String taskName) {
+        List<TaskDto> listOfTaskDtos = getAllTasksByUser(userDto);
+        for (TaskDto taskDto : listOfTaskDtos) {
+            if(taskDto.getName().equals(taskName)) {
+                return taskDto;
+            }
         }
-        return mapToTaskDto(taskRepository.getTaskByName(taskName));
+        return null;
     }
 
     @Override
 
-    public List<TaskDto> getAllTasksByUser(TelegramUserDto user) {
-        return taskRepository.getTasksByUser(mapToTelegramUser(user))
+    public List<TaskDto> getAllTasksByUser(TelegramUserDto userDto) {
+        return taskRepository.getTasksByUser(mapToTelegramUser(userDto))
                .stream()
                .map(task -> mapToTaskDto(task)).collect(Collectors.toList());
     }
@@ -54,12 +57,11 @@ public class TaskServiceImpl implements TaskService {
     @Transactional
     @Override
     public void deleteTask(TaskDto taskDto) {
-        Task task = taskRepository.getTaskByName(taskDto.getName());
+        Task task = taskRepository.getFirstTaskByName(taskDto.getName());
         TelegramUser user = userRepository.findTelegramUserByUsername(task.getUser().getUsername());
         user.deleteTask(task);
         userRepository.save(user);
         taskRepository.delete(task);
-
     }
 
 }
