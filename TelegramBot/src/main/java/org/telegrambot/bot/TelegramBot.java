@@ -76,6 +76,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             List<TaskDto> tasks = taskService.getAllTasksByUser(user);
             for (TaskDto task : tasks) {
                 isLittleTimeLeft(task, user.getChatId(), task.getDeadline());
+                isDeadlineComplete(task);
             }
         }
     }
@@ -171,6 +172,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         }
 
+
     }
 
     private void handleCallbackQuery(CallbackQuery callbackQuery) {
@@ -212,6 +214,15 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    private void isDeadlineComplete(TaskDto taskDto) {
+        LocalDateTime deadline = taskDto.getDeadline();
+        LocalDateTime currentTime = LocalDateTime.now();
+
+        if (deadline.isBefore(currentTime) || deadline.equals(currentTime)) {
+            taskService.deleteTask(taskDto);
+            sendMessage(taskDto.getUser().getChatId(), "Дедлайн задачи " + taskDto.getName() + " закончился");
+        }
+    }
 
     private void textUnderMessage(Long chatId, String text) {
 
