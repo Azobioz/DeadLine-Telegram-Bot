@@ -31,8 +31,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 
 import static org.telegrambot.mapper.TelegramUserMapper.mapToTelegramUser;
 
@@ -44,7 +42,6 @@ public class TelegramBot extends TelegramLongPollingBot {
     TaskDto taskDto = new TaskDto();
     TaskService taskService;
     TelegramUserService userService;
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     static final String YES_BUTTON = "YES_BUTTON";
     static final String NO_BUTTON = "NO_BUTTON";
@@ -110,7 +107,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         startCommandReceived(chatId, username);
                         break;
                     case "/create":
-                        createCommandReceived(chatId);
+                        createCommandReceived(chatId, userDto);
                         break;
                     case "/check":
                         checkCommandReceived(chatId, userDto);
@@ -156,6 +153,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             else {
                 String completedDeleteMessage = EmojiParser.parseToUnicode(":heavy_check_mark: Задача удалена, удалить еще одну?");
                 textUnderMessage(chatId, completedDeleteMessage);
+                userStates.put(chatId, BotState.AWAITING_YES_OR_NO_TO_DELETE_AGAIN);
             }
         }
 
@@ -165,9 +163,15 @@ public class TelegramBot extends TelegramLongPollingBot {
         taskDto.setName(text);
         userDto.addTask(taskDto);
         taskService.saveTask(taskDto);
-        String completeMessage = EmojiParser.parseToUnicode(":heavy_check_mark: Задача добавлена. Хотите создать еще одну задачу?");
-        textUnderMessage(chatId, completeMessage);
-        userStates.put(chatId, BotState.AWAITING_YES_OR_NO);
+        if (userDto.getTasksDto().size() != 15) {
+            String completeMessage = EmojiParser.parseToUnicode(":heavy_check_mark: Задача добавлена. Хотите создать еще одну задачу?");
+            textUnderMessage(chatId, completeMessage);
+            userStates.put(chatId, BotState.AWAITING_YES_OR_NO_TO_CREATE_AGAIN);
+        }
+        else {
+            String completeMessage = EmojiParser.parseToUnicode(":heavy_check_mark: Задача добавлена");
+            sendMessage(chatId, completeMessage);
+        }
     }
 
     private void awaitingDateBotStateReceived(long chatId, TelegramUserDto userDto, String text) {
@@ -220,10 +224,16 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void createCommandReceived(long chatId) {
-        String createMessage = EmojiParser.parseToUnicode(":alarm_clock:  Введите дату (день-месяц-год час:минута) \n Например 01-05-2025 12:45");
-        sendMessage(chatId, createMessage);
-        userStates.put(chatId, BotState.AWAITING_DATE);
+    private void createCommandReceived(long chatId, TelegramUserDto userDto) {
+        if (userDto.getTasksDto().size() == 15) {
+            String limitMessage = EmojiParser.parseToUnicode(":card_file_box: Всего можно создать 15 задач");
+            sendMessage(chatId, limitMessage);
+        }
+        else {
+            String createMessage = EmojiParser.parseToUnicode(":alarm_clock:  Введите дату (день-месяц-год час:минута)\nНапример 01-05-2025 12:45");
+            sendMessage(chatId, createMessage);
+            userStates.put(chatId, BotState.AWAITING_DATE);
+        }
     }
 
     private void handleCallbackQuery(CallbackQuery callbackQuery) {
@@ -232,18 +242,20 @@ public class TelegramBot extends TelegramLongPollingBot {
         Integer messageId = callbackQuery.getMessage().getMessageId();
 
         if (callbackData.equals(YES_BUTTON)) {
-            if (userStates.get(chatId).equals(BotState.AWAITING_YES_OR_NO)) {
+            TelegramUserDto userDto = userService.getTelegramUserByUsername(callbackQuery.getFrom().getUserName());
+            if (userStates.get(chatId).equals(BotState.AWAITING_YES_OR_NO_TO_CREATE_AGAIN) && userDto.getTasksDto().size() != 15) {
                 String createMessage = EmojiParser.parseToUnicode(":alarm_clock:  Введите дату (день-месяц-год час:минута)");
                 executeEditedMessage(chatId, createMessage, messageId);
                 userStates.put(chatId, BotState.AWAITING_DATE);
             }
-            else {
+            else if (userStates.get(chatId).equals(BotState.AWAITING_YES_OR_NO_TO_DELETE_AGAIN)) {
                 String nameMessage = EmojiParser.parseToUnicode(":pencil: Введите название задачи");
                 executeEditedMessage(chatId, nameMessage, messageId);
                 userStates.put(chatId, BotState.AWAITING_TASK_NAME_TO_DELETE);
-
             }
-        } else if (callbackData.equals(NO_BUTTON)) {
+
+        }
+        else if (callbackData.equals(NO_BUTTON)) {
             userStates.put(chatId, BotState.IDLE);
             executeEditedMessage(chatId, "Хорошего дня", messageId);
         }
@@ -492,5 +504,5 @@ public class TelegramBot extends TelegramLongPollingBot {
 }
 
 enum BotState {
-    IDLE, AWAITING_DATE, AWAITING_NAME, AWAITING_YES_OR_NO, AWAITING_TASK_NAME_TO_DELETE
+    IDLE, AWAITING_DATE, AWAITING_NAME, AWAITING_YES_OR_NO_TO_CREATE_AGAIN, AWAITING_YES_OR_NO_TO_DELETE_AGAIN, AWAITING_TASK_NAME_TO_DELETE
 }
