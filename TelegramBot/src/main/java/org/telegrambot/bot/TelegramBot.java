@@ -31,6 +31,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static org.telegrambot.mapper.TelegramUserMapper.mapToTelegramUser;
 
@@ -42,6 +45,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     TaskDto taskDto = new TaskDto();
     TaskService taskService;
     TelegramUserService userService;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     static final String YES_BUTTON = "YES_BUTTON";
     static final String NO_BUTTON = "NO_BUTTON";
@@ -61,18 +65,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
         catch (TelegramApiException e) {
             System.out.println("Error: " + e.getMessage());
-        }
-    }
-
-    @Scheduled(cron = "${cron.scheduler}")
-    private void checkDeadlines() {
-        List<TelegramUserDto> users = userService.getAllTelegramUsers();
-        for (TelegramUserDto user : users) {
-            List<TaskDto> tasks = taskService.getAllTasksByUser(user);
-            for (TaskDto task : tasks) {
-                isLittleTimeLeft(task, user.getChatId(), task.getDeadline());
-                isDeadlineComplete(task);
-            }
         }
     }
 
@@ -136,6 +128,27 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     }
 
+    private void sendDelayedMessage(long chatId, TaskDto taskDto, LocalDateTime deadline) {
+        LocalDateTime currentTime = LocalDateTime.now();
+        Duration differenceBetweenDeadlineAndNow = Duration.between(currentTime, deadline);
+        int twelveHoursLeft = (int) differenceBetweenDeadlineAndNow.getSeconds() - ((int) differenceBetweenDeadlineAndNow.getSeconds() - 43200);
+        int oneDayLeft = (int) differenceBetweenDeadlineAndNow.getSeconds() - ((int) differenceBetweenDeadlineAndNow.getSeconds() - 86400);
+
+        scheduler.schedule(() -> {
+            sendMessage(chatId, "Осталось 12 часов до задачи " + taskDto.getName());
+
+        }, twelveHoursLeft, TimeUnit.SECONDS);
+
+        scheduler.schedule(() -> {
+            sendMessage(chatId, "Остался день до задачи " + taskDto.getName());
+        }, oneDayLeft, TimeUnit.SECONDS);
+
+        scheduler.schedule(() -> {
+            sendMessage(chatId, "Дедлайн задачи " + taskDto.getName() + " закончился");
+        }, (int) differenceBetweenDeadlineAndNow.getSeconds(), TimeUnit.SECONDS);
+
+    }
+
     private void awaitingTaskNameToDeleteBotStateReceived(long chatId, TelegramUserDto userDto, String text) {
 
         TaskDto taskToDelete = taskService.getTaskByName(userDto, text);
@@ -172,6 +185,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             String completeMessage = EmojiParser.parseToUnicode(":heavy_check_mark: Задача добавлена");
             sendMessage(chatId, completeMessage);
         }
+        sendDelayedMessage(chatId, taskDto, taskDto.getDeadline());
     }
 
     private void awaitingDateBotStateReceived(long chatId, TelegramUserDto userDto, String text) {
@@ -353,34 +367,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         message.setReplyMarkup(getReplyKeyboardMarkup(userDto));
 
         executeMessage(message);
-    }
-
-    public void isLittleTimeLeft(TaskDto taskDto, long chatId, LocalDateTime deadline) {
-        LocalDateTime currentTime = LocalDateTime.now();
-        Duration duration = Duration.between(currentTime, deadline);
-
-        Period period = Period.between(currentTime.toLocalDate(), deadline.toLocalDate());
-
-        long years = period.getYears();
-        long months = period.getMonths();
-        long days;
-
-        if (duration.toHours() < 24) {
-            days = 0;
-        }
-        else {
-            days = period.getDays();
-        }
-        long hours = duration.toHoursPart();
-        long minutes = duration.toMinutesPart();
-
-
-        if (years == 0 && months == 0 && days == 1 && hours == 0 && minutes == 0) {
-            sendMessage(chatId, "Остался день до дедлайна задачи " + taskDto.getName());
-        }
-        else if (years == 0 && months == 0 && days == 0 && hours == 12 && minutes == 0) {
-            sendMessage(chatId, "Осталось 12 часов до дедлайна задачи " + taskDto.getName());
-        }
     }
 
     public String timesLeft(LocalDateTime deadline) {
