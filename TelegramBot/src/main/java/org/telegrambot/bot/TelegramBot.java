@@ -144,7 +144,9 @@ public class TelegramBot extends TelegramLongPollingBot {
         }, oneDayLeft, TimeUnit.SECONDS);
 
         scheduler.schedule(() -> {
-            sendMessage(chatId, "Дедлайн задачи " + taskDto.getName() + " закончился");
+            String deadlineCompletedMessage = EmojiParser.parseToUnicode(":exclamation: Дедлайн задачи " + taskDto.getName() + " закончился");
+            sendMessage(chatId, deadlineCompletedMessage);
+            taskService.deleteTask(taskDto);
         }, (int) differenceBetweenDeadlineAndNow.getSeconds(), TimeUnit.SECONDS);
 
     }
@@ -294,17 +296,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void isDeadlineComplete(TaskDto taskDto) {
-        LocalDateTime deadline = taskDto.getDeadline();
-        LocalDateTime currentTime = LocalDateTime.now();
-
-        if (deadline.isBefore(currentTime) || deadline.equals(currentTime)) {
-            taskService.deleteTask(taskDto);
-            String deadlineCompletedMessage = EmojiParser.parseToUnicode(":exclamation: Дедлайн задачи " + taskDto.getName() + " закончился");
-            sendMessage(taskDto.getUser().getChatId(), deadlineCompletedMessage);
-        }
-    }
-
     private void textUnderMessage(Long chatId, String text) {
 
         SendMessage message = new SendMessage();
@@ -400,25 +391,31 @@ public class TelegramBot extends TelegramLongPollingBot {
         else if (years > 4) {
             yearWord = "лет";
         }
+        else if (years == 0) {
+            yearWord = "годов";
+        }
         if (months > 1 && months < 5) {
             monthWord = "месяца";
         }
-        else if (months > 4) {
+        else if (months > 4 || months == 0) {
             monthWord = "месяцев";
         }
         if (days > 1 && days < 5) {
             dayWord = "дня";
         }
-        else if (days > 4) {
+        else if (days > 4 || days == 0) {
             dayWord = "дней";
         }
         if (hours > 1) {
             hourWord = "часа";
         }
+        else if (hours == 0) {
+            hourWord = "часов";
+        }
         if (minutes > 1 && minutes < 5) {
             minutesWord = "минуты";
         }
-        else if (minutes > 4) {
+        else if (minutes > 4 || minutes == 0) {
             minutesWord = "минут";
         }
         return "Осталось: " + years + " " + yearWord + ", " + months + " " + monthWord + ", " + days + " " + dayWord + ", " + hours + " " + hourWord + ", " + minutes + " " + minutesWord;
