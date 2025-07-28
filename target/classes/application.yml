@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/TelegramDeadlineBot
+    username: postgres
+    password: 12345
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+
+telegram:
+  bot:
+    name: Dl_Dead_Line_bot
+    token: 7423516906:AAGqHUeMOeje_Gqg9PWLUdX3KWcztZQzyPQ

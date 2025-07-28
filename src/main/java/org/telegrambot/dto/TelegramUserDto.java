@@ -19,7 +19,7 @@ public class TelegramUserDto {
     private long id;
 
     private String username;
-    private long chatId;
+    private String chatId;
     private List<TaskDto> tasksDto = new ArrayList<>();
 
     public void addTask(TaskDto task) {

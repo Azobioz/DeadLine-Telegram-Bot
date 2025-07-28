@@ -41,17 +41,18 @@ import static org.telegrambot.mapper.TelegramUserMapper.mapToTelegramUser;
 public class TelegramBot extends TelegramLongPollingBot {
 
     final private BotConfig config;
+    private final TelegramUserService telegramUserService;
     private Map<Long, BotState> userStates = new HashMap<>();
-    TaskDto taskDto = new TaskDto();
-    TaskService taskService;
-    TelegramUserService userService;
+    private final TaskDto taskDto = new TaskDto();
+    private final TaskService taskService;
+    private final TelegramUserService userService;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     static final String YES_BUTTON = "YES_BUTTON";
     static final String NO_BUTTON = "NO_BUTTON";
 
 
-    public TelegramBot(BotConfig config, TelegramUserService userService, TaskService taskService) {
+    public TelegramBot(BotConfig config, TelegramUserService userService, TaskService taskService, TelegramUserService telegramUserService) {
         this.config = config;
         this.userService = userService;
         this.taskService = taskService;
@@ -66,6 +67,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         catch (TelegramApiException e) {
             System.out.println("Error: " + e.getMessage());
         }
+        this.telegramUserService = telegramUserService;
     }
 
     @Override
@@ -273,7 +275,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
         else if (callbackData.equals(NO_BUTTON)) {
             userStates.put(chatId, BotState.IDLE);
-            executeEditedMessage(chatId, "Хорошего дня", messageId);
+            executeEditedMessage(chatId, "Хорошего времени!", messageId);
         }
         try {
             execute(new AnswerCallbackQuery(callbackQuery.getId()));
@@ -392,7 +394,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             yearWord = "лет";
         }
         else if (years == 0) {
-            yearWord = "годов";
+            yearWord = "года";
         }
         if (months > 1 && months < 5) {
             monthWord = "месяца";
@@ -406,10 +408,13 @@ public class TelegramBot extends TelegramLongPollingBot {
         else if (days > 4 || days == 0) {
             dayWord = "дней";
         }
-        if (hours > 1) {
+        if (hours > 1 && hours < 5) {
             hourWord = "часа";
         }
         else if (hours == 0) {
+            hourWord = "часов";
+        }
+        else if (hours > 4) {
             hourWord = "часов";
         }
         if (minutes > 1 && minutes < 5) {
@@ -448,7 +453,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         if (userService.getTelegramUserByUsername(username) == null) {
             TelegramUserDto userDto = new TelegramUserDto();
             userDto.setUsername(username);
-            userDto.setChatId(chatId);
+            userDto.setChatId(telegramUserService.encodeChatId(chatId));
             userService.saveTelegramUser(userDto);
         }
     }

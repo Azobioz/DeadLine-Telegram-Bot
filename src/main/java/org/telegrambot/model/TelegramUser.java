@@ -26,7 +26,7 @@ public class TelegramUser {
     @Length(min=5, max=250)
     private String username;
 
-    private long chatId;
+    private String chatId;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Task> tasks = new ArrayList<>();

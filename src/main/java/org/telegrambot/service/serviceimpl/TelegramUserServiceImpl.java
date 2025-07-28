@@ -44,4 +44,16 @@ public class TelegramUserServiceImpl implements TelegramUserService {
     public List<TelegramUserDto> getAllTelegramUsers() {
         return userRepository.findAll().stream().map(user -> mapToTelegramUserDto(user)).collect(Collectors.toList());
     }
+
+    @Override
+    public String encodeChatId(Long chatId) {
+        return Long.toHexString(chatId);
+    }
+
+    @Override
+    public Long decodeChatId(String chatId) {
+        return Long.parseLong(chatId);
+    }
+
+
 }

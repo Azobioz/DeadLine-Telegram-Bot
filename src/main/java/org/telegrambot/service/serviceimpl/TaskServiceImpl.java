@@ -19,7 +19,7 @@ import static org.telegrambot.mapper.TaskMapper.mapToTaskDto;
 import static org.telegrambot.mapper.TelegramUserMapper.mapToTelegramUser;
 
 @Service
-public class TaskServiceImpl implements TaskService {
+public class TaskServiceImpl implements  TaskService {
 
     private final UserRepository userRepository;
     private final TaskRepository taskRepository;
@@ -47,15 +47,14 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-
     public List<TaskDto> getAllTasksByUser(TelegramUserDto userDto) {
         return taskRepository.getTasksByUser(mapToTelegramUser(userDto))
                .stream()
                .map(task -> mapToTaskDto(task)).collect(Collectors.toList());
     }
 
-    @Transactional
     @Override
+    @Transactional
     public void deleteTask(TaskDto taskDto) {
         Task task = taskRepository.getFirstTaskByName(taskDto.getName());
         TelegramUser user = userRepository.findTelegramUserByUsername(task.getUser().getUsername());
