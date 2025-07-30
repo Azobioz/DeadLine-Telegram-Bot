@@ -1,6 +1,4 @@
-*/target
-
 /.idea
 src/main/resources/application.yml
-/.target
+/target
 

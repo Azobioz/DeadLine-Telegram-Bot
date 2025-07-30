@@ -1,0 +1,24 @@
+version: '0.0'
+services:
+  backend:
+    build: .
+    ports:
+      - "9000:9000"
+    depends_on:
+      - db
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/TelegramDeadlineBot
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=12345
+  db:
+    image: postgres:latest
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: TelegramDeadlineBot
+volumes:
+  pg_data:
