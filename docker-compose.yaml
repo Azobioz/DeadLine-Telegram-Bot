@@ -1,7 +1,9 @@
-version: '0.0'
 services:
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: azobioz/deadline-telegram-bot:0.0
     ports:
       - "9000:9000"
     depends_on:
